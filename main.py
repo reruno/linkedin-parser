@@ -1,7 +1,19 @@
 from bs4 import BeautifulSoup
 import pprint
+# Import necessary types for hinting
+from typing import List, Dict, Optional, TypedDict
 
-def parse_linkedin_jobs(html_content):
+# Define a specific type for our job data dictionary for clarity
+class JobData(TypedDict):
+    title: Optional[str]
+    company: Optional[str]
+    location: Optional[str]
+    url: Optional[str]
+    date_posted_text: Optional[str]
+    date_posted_iso: Optional[str]
+    company_logo_url: Optional[str]
+
+def parse_linkedin_jobs(html_content: str) -> List[JobData]:
     """
     Parses the HTML content of a LinkedIn job search results page.
 
@@ -9,51 +21,56 @@ def parse_linkedin_jobs(html_content):
         html_content (str): A string containing the raw HTML of the page.
 
     Returns:
-        list: A list of dictionaries, where each dictionary contains the
-              details of a single job posting. Returns an empty list
-              if no jobs are found or in case of an error.
+        List[JobData]: A list of dictionaries, where each dictionary contains the
+                       details of a single job posting. Returns an empty list
+                       if no jobs are found or in case of an error.
     """
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # Find all list items that represent a job card
     job_cards = soup.find_all('div', class_='base-search-card')
     
-    extracted_jobs = []
+    extracted_jobs: List[JobData] = []
 
     for card in job_cards:
-        job_data = {}
-
         # Extract Job Title
         title_element = card.find('h3', class_='base-search-card__title')
-        job_data['title'] = title_element.get_text(strip=True) if title_element else None
+        title = title_element.get_text(strip=True) if title_element else None
 
         # Extract Company Name
         company_element = card.find('h4', class_='base-search-card__subtitle')
+        company = None
         if company_element and company_element.find('a'):
-            job_data['company'] = company_element.find('a').get_text(strip=True)
-        else:
-            job_data['company'] = None
+            company = company_element.find('a').get_text(strip=True)
 
         # Extract Location
         location_element = card.find('span', class_='job-search-card__location')
-        job_data['location'] = location_element.get_text(strip=True) if location_element else None
+        location = location_element.get_text(strip=True) if location_element else None
 
         # Extract Job URL
         url_element = card.find('a', class_='base-card__full-link')
-        job_data['url'] = url_element['href'] if url_element else None
+        url = url_element['href'] if url_element else None
         
         # Extract Date Posted
         date_element = card.find('time', class_='job-search-card__listdate')
-        job_data['date_posted_text'] = date_element.get_text(strip=True) if date_element else None
-        job_data['date_posted_iso'] = date_element['datetime'] if date_element else None
+        date_posted_text = date_element.get_text(strip=True) if date_element else None
+        date_posted_iso = date_element['datetime'] if date_element else None
 
         # Extract Company Logo URL
         logo_element = card.find('img', class_='artdeco-entity-image')
-        # On LinkedIn, the actual URL is often in 'data-delayed-url'
+        company_logo_url = None
         if logo_element:
-            job_data['company_logo_url'] = logo_element.get('data-delayed-url', logo_element.get('src'))
-        else:
-            job_data['company_logo_url'] = None
+            company_logo_url = logo_element.get('data-delayed-url', logo_element.get('src'))
+
+        # Create the dictionary that conforms to the JobData TypedDict
+        job_data: JobData = {
+            'title': title,
+            'company': company,
+            'location': location,
+            'url': url,
+            'date_posted_text': date_posted_text,
+            'date_posted_iso': date_posted_iso,
+            'company_logo_url': company_logo_url,
+        }
 
         extracted_jobs.append(job_data)
         
