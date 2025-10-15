@@ -21,7 +21,7 @@ from selenium_manager import SeleniumManager
 if __name__ == "__main__":
     # Define the company page you want to scrape
     target_url = "https://uk.linkedin.com/school/calyptus-web3/?trk=public_jobs_jserp-result_job-search-card-subtitle"
-    
+    target_url = "https://www.linkedin.com/company/solhelix?trk=public_jobs_jserp-result_job-search-card-subtitle"
     manager = None
     try:
         # 1. Create the manager (this also starts the browser and logs in)
@@ -36,7 +36,6 @@ if __name__ == "__main__":
         else:
             print("\n❌ Could not retrieve the follower count.")
         
-        time.sleep(1000)
     finally:
         # 4. Ensure the browser is always closed
         if manager:

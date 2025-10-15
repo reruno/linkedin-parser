@@ -18,6 +18,7 @@ import re
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium_manager import SeleniumManager
 
 # --- 2. Type Definitions ---
 class JobData(TypedDict):
@@ -30,59 +31,6 @@ class JobData(TypedDict):
     date_posted_text: Optional[str]
     date_posted_iso: Optional[str]
     company_logo_url: Optional[str]
-
-
-# --- 3. Selenium Manager for Reusing Browser Session ---
-class SeleniumManager:
-    """Manages a single, reusable Selenium browser session."""
-    def __init__(self):
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-        service = Service()
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        print("🚀 Headless browser session started.")
-    
-    def login(self):
-        """Logs into LinkedIn using credentials from the .env file."""
-        print("🔐 Attempting to log into LinkedIn...")
-        self.driver.get("https://www.linkedin.com/login")
-        time.sleep(2)
-
-        try:
-            self.driver.find_element(By.ID, "username").send_keys(self.username)
-            self.driver.find_element(By.ID, "password").send_keys(self.password)
-            self.driver.find_element(By.XPATH, '//button[@type="submit"]').click()
-            time.sleep(5)
-            print("✅ Login successful!")
-        except Exception as e:
-            print(f"❌ Login failed. Error: {e}")
-            self.close()
-            raise
-
-    def get_followers(self, company_url: str) -> Optional[int]:
-        """Navigates to a company page and scrapes the follower count."""
-        if not company_url:
-            return None
-        try:
-            self.driver.get(company_url)
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-            h3_element = soup.find('h3', class_='top-card-layout__first-subline')
-            if h3_element:
-                match = re.search(r'([\d,]+)\s+followers', h3_element.get_text())
-                if match:
-                    return int(match.group(1).replace(',', ''))
-            return None
-        except Exception as e:
-            print(f"    - Could not get followers for {company_url}. Error: {e}")
-            return None
-
-    def close(self):
-        """Closes the browser session."""
-        if self.driver:
-            self.driver.quit()
-            print("\nBrowser session closed.")
-
 
 # --- 4. Core Functions ---
 def enrich_jobs_with_followers(jobs_list: List[JobData], selenium_manager: SeleniumManager) -> List[JobData]:
@@ -98,7 +46,7 @@ def enrich_jobs_with_followers(jobs_list: List[JobData], selenium_manager: Selen
         print(f"  - Scraping ({i+1}/{len(unique_company_urls)}): {url}")
         followers = selenium_manager.get_followers(url)
         company_followers_cache[url] = followers
-        time.sleep(1) # Be respectful between requests
+        time.sleep(0.2) # Be respectful between requests
 
     for job in jobs_list:
         job['company_followers_number'] = company_followers_cache.get(job['company_url'])
