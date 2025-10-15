@@ -46,7 +46,7 @@ def enrich_jobs_with_followers(jobs_list: List[JobData], selenium_manager: Selen
         print(f"  - Scraping ({i+1}/{len(unique_company_urls)}): {url}")
         followers = selenium_manager.get_followers(url)
         company_followers_cache[url] = followers
-        time.sleep(0.2) # Be respectful between requests
+        time.sleep(2) # Be respectful between requests
 
     for job in jobs_list:
         job['company_followers_number'] = company_followers_cache.get(job['company_url'])
@@ -61,7 +61,8 @@ def fetch_linkedin_jobs(keywords: str, location: str, limit: int = 50, f_TPR: st
     pages_to_fetch = math.ceil(limit / 25)
     print(f"🎯 Goal: Fetch {limit} jobs via API. This will require up to {pages_to_fetch} pages.")
     # (The rest of this function is unchanged)
-    for page_num in range(pages_to_fetch):
+    page_num = 0
+    while True:
         start = page_num * 25
         base_url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
         params = {'keywords': keywords, 'location': location, 'start': start, 'f_TPR': f_TPR}
@@ -80,6 +81,8 @@ def fetch_linkedin_jobs(keywords: str, location: str, limit: int = 50, f_TPR: st
         all_jobs.extend(newly_parsed_jobs)
         if len(all_jobs) >= limit:
             break
+        page_num += 1
+        time.sleep(1)
     return all_jobs[:limit]
 
 
@@ -144,10 +147,10 @@ if __name__ == "__main__":
     selenium_manager = None
     try:
         # --- Search Parameters ---
-        search_keywords = "Javascript"
+        search_keywords = "Python"
         search_location = "Poland"
-        time_filter = "r86400"  # Past 24 hours
-        job_limit = 3
+        time_filter = "r2592000"  # Past 24 hours
+        job_limit = 75
 
         # Step 1: Fetch initial job data using requests
         jobs_list = fetch_linkedin_jobs(
@@ -156,10 +159,10 @@ if __name__ == "__main__":
             limit=job_limit,
             f_TPR=time_filter
         )
-
+        print(f"\nFound {len(jobs_list)} jobs\n")
         if jobs_list:
             # Step 2: Initialize Selenium and enrich data with followers
-            selenium_manager = SeleniumManager()
+            selenium_manager = SeleniumManager(debug=True)
             enriched_jobs = enrich_jobs_with_followers(jobs_list, selenium_manager)
 
             # Step 3: Export the final enriched data
