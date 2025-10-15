@@ -25,7 +25,7 @@ if __name__ == "__main__":
     manager = None
     try:
         # 1. Create the manager (this also starts the browser and logs in)
-        manager = SeleniumManager()
+        manager = SeleniumManager(debug=True)
         
         # 2. Get the follower count
         follower_count = manager.get_followers(target_url)
@@ -35,7 +35,7 @@ if __name__ == "__main__":
             print(f"\n📈 Result: The company has {follower_count} followers.")
         else:
             print("\n❌ Could not retrieve the follower count.")
-        
+        time.sleep(1000)
     finally:
         # 4. Ensure the browser is always closed
         if manager:
