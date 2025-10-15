@@ -1,329 +1,206 @@
-from bs4 import BeautifulSoup
-import pprint
-# Import necessary types for hinting
-from typing import List, Dict, Optional, TypedDict
+# -*- coding: utf-8 -*-
 
-# Define a specific type for our job data dictionary for clarity
+"""
+A script to fetch and parse job listings from LinkedIn's guest-facing API.
+"""
+
+# --- 1. Dependencies ---
+# Make sure to install these libraries first:
+# pip install requests beautifulsoup4
+import requests
+from bs4 import BeautifulSoup
+from typing import List, Optional, TypedDict
+# --- 4. Export Functions ---
+import csv
+import pandas as pd
+
+# --- 2. Type Definitions ---
+# Defines the structure for a single job posting's data for clarity and type checking.
 class JobData(TypedDict):
     title: Optional[str]
-    company: Optional[str]
+    company_name: Optional[str]
+    company_url: Optional[str]
     location: Optional[str]
     url: Optional[str]
     date_posted_text: Optional[str]
     date_posted_iso: Optional[str]
     company_logo_url: Optional[str]
 
-def parse_linkedin_jobs(html_content: str) -> List[JobData]:
+
+# --- 3. Core Functions ---
+def fetch_linkedin_jobs(
+    keywords: str,
+    location: str,
+    start: int = 0,
+    f_TPR: str = ""
+) -> List[JobData]:
     """
-    Parses the HTML content of a LinkedIn job search results page.
+    Fetches job listings from LinkedIn by making an API request and then parses the HTML response.
 
     Args:
-        html_content (str): A string containing the raw HTML of the page.
+        keywords (str): The job title or keyword to search for (e.g., "Python Developer").
+        location (str): The geographical location for the job search (e.g., "Poland").
+        start (int): The starting point for pagination, typically in increments of 25.
+        f_TPR (str): Time-posting range filter. Accepts "r86400" (last 24h),
+                     "r604800" (last week), or "r2592000" (last month).
 
     Returns:
-        List[JobData]: A list of dictionaries, where each dictionary contains the
-                       details of a single job posting. Returns an empty list
-                       if no jobs are found or in case of an error.
+        A list of job data dictionaries. Returns an empty list if the request fails.
+    """
+    base_url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+    params = {
+        'keywords': keywords,
+        'location': location,
+        'start': start,
+        'f_TPR': f_TPR
+    }
+
+    print(f"🚀 Fetching jobs from LinkedIn with params: {params}")
+    try:
+        # It's good practice to include a user-agent header to mimic a browser
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(base_url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()  # Raises an exception for bad status codes (4xx or 5xx)
+    except requests.exceptions.RequestException as e:
+        print(f"❌ An error occurred during the request: {e}")
+        return []
+
+    # Directly parse the response text and return the result
+    return parse_linkedin_jobs(response.text)
+
+
+def parse_linkedin_jobs(html_content: str) -> List[JobData]:
+    """
+    Parses the raw HTML content from a LinkedIn job search response.
+
+    Args:
+        html_content (str): The HTML string to be parsed.
+
+    Returns:
+        A list of job data dictionaries, with each dictionary representing one job posting.
     """
     soup = BeautifulSoup(html_content, 'html.parser')
-    
     job_cards = soup.find_all('div', class_='base-search-card')
-    
     extracted_jobs: List[JobData] = []
 
     for card in job_cards:
-        # Extract Job Title
+        # Extract data for each field, handling cases where an element might be missing
         title_element = card.find('h3', class_='base-search-card__title')
         title = title_element.get_text(strip=True) if title_element else None
-
-        # Extract Company Name
+        
         company_element = card.find('h4', class_='base-search-card__subtitle')
-        company = None
+        company_name = None
+        company_url = None
         if company_element and company_element.find('a'):
-            company = company_element.find('a').get_text(strip=True)
-
-        # Extract Location
+            company_name = company_element.find('a').get_text(strip=True)
+            company_url = company_element.find('a')['href']
+            
         location_element = card.find('span', class_='job-search-card__location')
         location = location_element.get_text(strip=True) if location_element else None
-
-        # Extract Job URL
+        
         url_element = card.find('a', class_='base-card__full-link')
         url = url_element['href'] if url_element else None
         
-        # Extract Date Posted
         date_element = card.find('time', class_='job-search-card__listdate')
         date_posted_text = date_element.get_text(strip=True) if date_element else None
-        date_posted_iso = date_element['datetime'] if date_element else None
-
-        # Extract Company Logo URL
+        date_posted_iso = date_element.get('datetime') if date_element else None
+        
         logo_element = card.find('img', class_='artdeco-entity-image')
         company_logo_url = None
         if logo_element:
             company_logo_url = logo_element.get('data-delayed-url', logo_element.get('src'))
-
-        # Create the dictionary that conforms to the JobData TypedDict
+            
         job_data: JobData = {
             'title': title,
-            'company': company,
+            'company_name': company_name,
+            'company_url': company_url,
             'location': location,
             'url': url,
             'date_posted_text': date_posted_text,
             'date_posted_iso': date_posted_iso,
             'company_logo_url': company_logo_url,
         }
-
         extracted_jobs.append(job_data)
         
     return extracted_jobs
 
-# --- Example Usage ---
-# Paste the HTML content you provided into this multiline string
-html_from_linkedin = """
-<body><li>
-        
-    
 
-    
-    
-    
-      <div class="base-card relative w-full hover:no-underline focus:no-underline
-        base-card--link
-         base-search-card base-search-card--link job-search-card" data-entity-urn="urn:li:jobPosting:4305720538" data-impression-id="jobs-search-result-0" data-reference-id="dXbebcy5Zc8hoaoltSvOaA==" data-tracking-id="JkxHhZA8S6oCIfrPrmN6Gg==" data-column="1" data-row="1">
-        
 
-        <a class="base-card__full-link absolute top-0 right-0 bottom-0 left-0 p-0 z-[2] outline-offset-[4px]" href="https://pl.linkedin.com/jobs/view/819-senior-golang-developer-short-term-at-intetics-4305720538?position=1&amp;pageNum=0&amp;refId=dXbebcy5Zc8hoaoltSvOaA%3D%3D&amp;trackingId=JkxHhZA8S6oCIfrPrmN6Gg%3D%3D" data-tracking-control-name="public_jobs_jserp-result_search-card" data-tracking-client-ingraph="" data-tracking-will-navigate="">
-          
-          <span class="sr-only">
-              
-        
-        819 | Senior Golang Developer (Short term)
-      
-      
-          </span>
-        </a>
+def export_to_csv(data: List[JobData], filename: str):
+    """
+    Exports a list of job data dictionaries to a CSV file.
 
-      
-        
-    <div class="search-entity-media">
-        
-      <img class="artdeco-entity-image artdeco-entity-image--square-4
-          " data-delayed-url="https://media.licdn.com/dms/image/v2/D4D0BAQGPo4xi1y3FaA/company-logo_100_100/B4DZc10aZbGUAQ-/0/1748954621937/intetics_logo?e=1762992000&amp;v=beta&amp;t=MTOFD7589bcvwhWl2TQGPFtEjcAcdFl9HJRBy7DxCc0" data-ghost-classes="artdeco-entity-image--ghost" data-ghost-url="https://static.licdn.com/aero-v1/sc/h/6puxblwmhnodu6fjircz4dn4h" alt="">
-  
-    </div>
-  
+    Args:
+        data (List[JobData]): The list of jobs to export.
+        filename (str): The desired name of the output file (without extension).
+    """
+    if not data:
+        print("⚠️ No data to export.")
+        return
 
-        <div class="base-search-card__info">
-          <h3 class="base-search-card__title">
-            
-        819 | Senior Golang Developer (Short term)
-      
-          </h3>
+    # Ensure the filename ends with .csv
+    csv_filename = f"{filename}.csv"
+    
+    # Get the headers from the keys of the first dictionary
+    headers = data[0].keys()
 
-            <h4 class="base-search-card__subtitle">
-              
-          <a class="hidden-nested-link" data-tracking-client-ingraph="" data-tracking-control-name="public_jobs_jserp-result_job-search-card-subtitle" data-tracking-will-navigate="" href="https://www.linkedin.com/company/intetics?trk=public_jobs_jserp-result_job-search-card-subtitle">
-            Intetics
-          </a>
-      
-            </h4>
+    try:
+        with open(csv_filename, 'w', newline='', encoding='utf-8') as output_file:
+            writer = csv.DictWriter(output_file, fieldnames=headers)
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"✅ Data successfully exported to {csv_filename}")
+    except IOError as e:
+        print(f"❌ Error exporting to CSV: {e}")
 
-            <div class="base-search-card__metadata">
-              
-          <span class="job-search-card__location">
-            Poland
-          </span>
 
-        
-    
-    
-    
-    
+def export_to_excel(data: List[JobData], filename: str):
+    """
+    Exports a list of job data dictionaries to an Excel file (.xlsx).
 
-      <div class="job-posting-benefits text-sm">
-        <icon class="job-posting-benefits__icon" data-delayed-url="https://static.licdn.com/aero-v1/sc/h/8zmuwb93gzlb935fk4ao4z779" data-svg-class-name="job-posting-benefits__icon-svg"></icon>
-        <span class="job-posting-benefits__text">
-          Be an early applicant
-        </span>
-      </div>
-  
+    Args:
+        data (List[JobData]): The list of jobs to export.
+        filename (str): The desired name of the output file (without extension).
+    """
+    if not data:
+        print("⚠️ No data to export.")
+        return
 
-          <time class="job-search-card__listdate" datetime="2025-09-26">
-            
+    # Ensure the filename ends with .xlsx
+    excel_filename = f"{filename}.xlsx"
+    
+    try:
+        # Convert the list of dictionaries to a pandas DataFrame
+        df = pd.DataFrame.from_dict(data)
+        # Write the DataFrame to an Excel file
+        df.to_excel(excel_filename, index=False)
+        print(f"✅ Data successfully exported to {excel_filename}")
+    except Exception as e:
+        print(f"❌ Error exporting to Excel: {e}")
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+# --- 5. Example Usage ---
+if __name__ == "__main__":
+    search_keywords = "Golang"
+    search_location = "Poland"
+    time_filter = "r604800"  # Past Week
+    
+    jobs_list = fetch_linkedin_jobs(
+        keywords=search_keywords,
+        location=search_location,
+        f_TPR=time_filter
+    )
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-      2 weeks ago
-  
-          </time>
-
-          <span class="job-search-card__easy-apply-label job-search-card__easy-apply-label--with-middot">
-            Apply Now
-          </span>
-      
-            </div>
-        </div>
-      
-    
-      </div>
-  
-  
-  
-  
-      </li>
-      <li>
-        
-    
-
-    
-    
-    
-      <div class="base-card relative w-full hover:no-underline focus:no-underline
-        base-card--link
-         base-search-card base-search-card--link job-search-card" data-entity-urn="urn:li:jobPosting:4270690853" data-impression-id="jobs-search-result-1" data-reference-id="dXbebcy5Zc8hoaoltSvOaA==" data-tracking-id="yCY5vpAiP2eLE/AHTjNOmA==" data-column="1" data-row="2">
-        
-
-        <a class="base-card__full-link absolute top-0 right-0 bottom-0 left-0 p-0 z-[2] outline-offset-[4px]" href="https://pl.linkedin.com/jobs/view/backend-engineer-senior-go-nord-account-team-at-nord-security-4270690853?position=2&amp;pageNum=0&amp;refId=dXbebcy5Zc8hoaoltSvOaA%3D%3D&amp;trackingId=yCY5vpAiP2eLE%2FAHTjNOmA%3D%3D" data-tracking-control-name="public_jobs_jserp-result_search-card" data-tracking-client-ingraph="" data-tracking-will-navigate="">
-          
-          <span class="sr-only">
-              
-        
-        Backend Engineer | Senior | Go | Nord Account Team
-      
-      
-          </span>
-        </a>
-
-      
-        
-    <div class="search-entity-media">
-        
-      <img class="artdeco-entity-image artdeco-entity-image--square-4
-          " data-delayed-url="https://media.licdn.com/dms/image/v2/C4E0BAQE7Fs46KFoosw/company-logo_100_100/company-logo_100_100/0/1630627290687/nordsecurity_logo?e=1762992000&amp;v=beta&amp;t=oyJ6Y9xinqgUhUveQUk1qS6gta22emU9dWWQz9DWq3U" data-ghost-classes="artdeco-entity-image--ghost" data-ghost-url="https://static.licdn.com/aero-v1/sc/h/6puxblwmhnodu6fjircz4dn4h" alt="">
-  
-    </div>
-  
-
-        <div class="base-search-card__info">
-          <h3 class="base-search-card__title">
-            
-        Backend Engineer | Senior | Go | Nord Account Team
-      
-          </h3>
-
-            <h4 class="base-search-card__subtitle">
-              
-          <a class="hidden-nested-link" data-tracking-client-ingraph="" data-tracking-control-name="public_jobs_jserp-result_job-search-card-subtitle" data-tracking-will-navigate="" href="https://www.linkedin.com/company/nordsecurity?trk=public_jobs_jserp-result_job-search-card-subtitle">
-            Nord Security
-          </a>
-      
-            </h4>
-
-            <div class="base-search-card__metadata">
-              
-          <span class="job-search-card__location">
-            Warsaw, Mazowieckie, Poland
-          </span>
-
-        
-    
-    
-    
-    
-
-      <div class="job-posting-benefits text-sm">
-        <icon class="job-posting-benefits__icon" data-delayed-url="https://static.licdn.com/aero-v1/sc/h/8zmuwb93gzlb935fk4ao4z779" data-svg-class-name="job-posting-benefits__icon-svg"></icon>
-        <span class="job-posting-benefits__text">
-          Be an early applicant
-        </span>
-      </div>
-  
-
-          <time class="job-search-card__listdate" datetime="2025-07-21">
-            
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-      2 months ago
-  
-          </time>
-
-          <span class="job-search-card__easy-apply-label job-search-card__easy-apply-label--with-middot">
-            Apply Now
-          </span>
-      
-            </div>
-        </div>
-      
-    
-      </div>
-  
-  
-  
-  
-      </li>
-</body>
-"""
-
-# Call the function and pretty-print the result
-parsed_data = parse_linkedin_jobs(html_from_linkedin)
-pprint.pprint(parsed_data)
+    if jobs_list:
+        print(f"\n✅ Successfully found {len(jobs_list)} jobs.")
+        
+        # Define a base filename for the output files
+        output_filename = f"linkedin_jobs_{search_keywords}_{search_location}".replace(" ", "_")
+        
+        # Export the data to both formats
+        export_to_csv(jobs_list, output_filename)
+        export_to_excel(jobs_list, output_filename)
+        
+    else:
+        print("\n❌ No jobs found. This could be due to no results or the request being blocked by LinkedIn.")
