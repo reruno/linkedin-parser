@@ -42,6 +42,23 @@ class SeleniumManager:
         service = Service()
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
         print("🚀 Headless browser session started.")
+    
+    def login(self):
+        """Logs into LinkedIn using credentials from the .env file."""
+        print("🔐 Attempting to log into LinkedIn...")
+        self.driver.get("https://www.linkedin.com/login")
+        time.sleep(2)
+
+        try:
+            self.driver.find_element(By.ID, "username").send_keys(self.username)
+            self.driver.find_element(By.ID, "password").send_keys(self.password)
+            self.driver.find_element(By.XPATH, '//button[@type="submit"]').click()
+            time.sleep(5)
+            print("✅ Login successful!")
+        except Exception as e:
+            print(f"❌ Login failed. Error: {e}")
+            self.close()
+            raise
 
     def get_followers(self, company_url: str) -> Optional[int]:
         """Navigates to a company page and scrapes the follower count."""
