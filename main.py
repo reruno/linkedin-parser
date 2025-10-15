@@ -170,9 +170,9 @@ def export_to_excel(data: List[JobData], filename: str):
 # --- 5. Example Usage ---
 if __name__ == "__main__":
     # --- Search Parameters ---
-    search_keywords = "Golang"
+    search_keywords = "Javascript"
     search_location = "Poland"
-    time_filter = "r2592000"  # Past Month
+    time_filter = "r86400"  # Past Month
     job_limit = 100            # Set your desired limit here
 
     jobs_list = fetch_linkedin_jobs(
